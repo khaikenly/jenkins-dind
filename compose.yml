@@ -1,0 +1,54 @@
+version: '3.8'
+
+x-jenkins-config:
+  &jenkins-env
+  DOCKER_HOST: ${DOCKER_HOST:-tcp://docker:2376}
+  DOCKER_CERT_PATH: ${DOCKER_CERT_PATH:-/certs/client}
+  DOCKER_TLS_VERIFY: ${DOCKER_TLS_VERIFY:-1}
+
+x-docker-config:
+  &docker-env
+  DOCKER_TLS_CERTDIR: ${DOCKER_TLS_CERTDIR:-/certs}
+
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jenkins
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - ./jenkins_home:/var/jenkins_home
+      - jenkins-docker-certs:/certs/client:ro
+    environment:
+      <<: *jenkins-env
+    networks:
+      - jenkins
+    restart: always
+  
+  # docker in docker
+  dind:
+    image: docker:dind
+    container_name: dind
+    privileged: true
+    volumes:
+      - ./jenkins_home:/var/jenkins_home
+      - jenkins-docker-certs:/certs/client
+    environment:
+      <<: *docker-env
+    ports:
+      - 2376:2376
+    restart: always
+    networks:
+      jenkins:
+        aliases:
+          - docker
+
+volumes:
+  jenkins-docker-certs:
+
+networks:
+  jenkins:
+    driver: bridge
